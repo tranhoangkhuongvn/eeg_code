@@ -113,35 +113,35 @@ class EEG_Net(nn.Module):
 	def __init__(self):
 		super(EEG_Net, self).__init__()
 		# convolutional layer (sees 1x64x1525 input data)
-		self.conv1 = nn.Conv2d(1, 16, 3, padding=1)
+		self.conv1 = nn.Conv2d(1, 16, 3, padding=1,bias=False)
 		self.batch_norm1 = nn.BatchNorm2d(16) 
-		self.conv2 = nn.Conv2d(16, 32, 3, padding=1)
+		self.conv2 = nn.Conv2d(16, 32, 3, padding=1,bias=False)
 		self.batch_norm2 = nn.BatchNorm2d(32) 
 		# max pooling layer
 		self.pool = nn.MaxPool2d(2, 2)
 		
-		self.fc1 = nn.Linear(32 * 16 * 381, 4000)
-		
-		self.fc2 = nn.Linear(4000, 2000)
-
-		self.fc3 = nn.Linear(2000, 4)
+		self.fc1 = nn.Linear(32 * 16 * 381, 4000, bias=False)
+		self.batch_norm3 = nn.BatchNorm1d(4000)	
+		self.fc2 = nn.Linear(4000, 2000, bias=False)
+		self.batch_norm4 = nn.BatchNorm1d(2000)
+		self.fc3 = nn.Linear(2000, 2)
 		# dropout layer (p=0.25)
 		self.dropout = nn.Dropout(0.25)
 
 	def forward(self, x):
 		# add sequence of convolutional and max pooling layers
-		x = self.pool(self.batch_norm1(F.relu(self.conv1(x))))
-		x = self.pool(self.batch_norm2(F.relu(self.conv2(x))))
+		x = self.pool(F.relu(self.batch_norm1(self.conv1(x))))
+		x = self.pool(F.relu(self.batch_norm2(self.conv2(x))))
 		# flatten image input
 		x = x.view(-1, 32 * 16 * 381)
 		# add dropout layer
 		x = self.dropout(x)
 		# add 1st hidden layer, with relu activation function
-		x = F.relu(self.fc1(x))
+		x = F.relu(self.batch_norm3(self.fc1(x)))
 		# add dropout layer
 		x = self.dropout(x)
 		# add 2nd hidden layer, with relu activation function
-		x = F.relu(self.fc2(x))
+		x = F.relu(self.batch_norm4(self.fc2(x)))
 		x = self.dropout(x)
 		x = self.fc3(x)
 

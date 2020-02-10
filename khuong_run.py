@@ -32,6 +32,7 @@ SAVE_DATA_FILE = 'data.pik'
 
 if __name__ == '__main__':
 	eeg_data = EEGDATA()
+	print(eeg_data)
 	if (not USE_SAVED_DATA) or (not os.path.exists(SAVE_DATA_FILE)):
 		data = eeg_data.load()
 
@@ -59,18 +60,17 @@ if __name__ == '__main__':
 			k = pickle.load(io)
 			input_data = k['input_data']
 			labels = k['labels']
-	#print('input_data.shape:', input_data.shape)
-	#print(type(input_data), input_data.dtype)
-	#print('labels:', labels.shape)
-	#print(len(input_data[0]))
-	#print(input_data[0])
-	#print('Scaling the input:')
-	#input_numpy = input_data.numpy()
-	#input_numpy = preprocessing.minmax_scale(input_numpy)
-	#print(input_numpy[0])
-	#input_data = torch.tensor(input_numpy)	
-	#print(type(input_data), input_data.dtype)
-	#labels = [l - 1 for l in labels]
+	print('input_data.shape:', input_data.shape)
+	print(type(input_data), input_data.dtype)
+	print('labels:', labels.shape)
+	print(len(input_data[0]))
+	print(input_data[0])
+	print('Scaling the input:')
+	input_numpy = input_data.numpy()
+	input_numpy = preprocessing.minmax_scale(input_numpy)
+	print(input_numpy[0])
+	input_data = torch.tensor(input_numpy)	
+	print(type(input_data), input_data.dtype)
 	labels = labels - 1.0
 	print(labels)
 
@@ -109,7 +109,7 @@ if __name__ == '__main__':
 	# specify optimizer
 	optimizer = optim.SGD(model.parameters(), lr=0.01)
 	# number of epochs to train the model
-	n_epochs = 20 # you may increase this number to train a final model
+	n_epochs = 10 # you may increase this number to train a final model
 
 	valid_loss_min = np.Inf # track change in validation loss
 
