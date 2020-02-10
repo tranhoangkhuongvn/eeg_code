@@ -3,7 +3,6 @@ import os
 import sys
 import time
 import pickle
-from progress.spinner import Spinner
 sys.path.append('./')
 import numpy as np
 import torch
@@ -13,6 +12,7 @@ from algorithms import CNNclassification, ClassificationNetwork, EEG_Net
 from torch.utils.data.sampler import SubsetRandomSampler
 import torch.utils.data as torch_data_utils
 import torch.optim as optim
+from sklearn import preprocessing
 
 # check if CUDA is available
 train_on_gpu = torch.cuda.is_available()
@@ -59,14 +59,23 @@ if __name__ == '__main__':
 			k = pickle.load(io)
 			input_data = k['input_data']
 			labels = k['labels']
-	print('input_data.shape:', input_data.shape)
-	print('labels:', labels.shape)
+	#print('input_data.shape:', input_data.shape)
+	#print(type(input_data), input_data.dtype)
+	#print('labels:', labels.shape)
+	#print(len(input_data[0]))
+	#print(input_data[0])
+	#print('Scaling the input:')
+	#input_numpy = input_data.numpy()
+	#input_numpy = preprocessing.minmax_scale(input_numpy)
+	#print(input_numpy[0])
+	#input_data = torch.tensor(input_numpy)	
+	#print(type(input_data), input_data.dtype)
 	#labels = [l - 1 for l in labels]
 	labels = labels - 1.0
 	print(labels)
 
-	valid_size = 0.2
-	batch_size = 20
+	valid_size = 0.3
+	batch_size = BATCH_SIZE 
 	# obtain training indices that will be used for validation
 	num_train = input_data.shape[0] 
 	indices = list(range(num_train))
@@ -109,46 +118,66 @@ if __name__ == '__main__':
 		# keep track of training and validation loss
 		train_loss = 0.0
 		valid_loss = 0.0
-		
+		class_correct = [0.0 for i in range(4)]	
+		class_total = [0.0 for i in range(4)]
 		###################
 		# train the model #
 		###################
 		model.train()
+		batch = 0
 		for data, target in train_loader:
+			batch += 1
 			# move tensors to GPU if CUDA is available
 			if train_on_gpu:
 				data, target = data.cuda(), target.long().cuda()
 			# clear the gradients of all optimized variables
-
-
-			optimizer.zero_grad()
-			# forward pass: compute predicted outputs by passing inputs to the model
-			data = data.reshape(BATCH_SIZE, 1, eeg_data.num_of_channels, eeg_data.num_of_time_frames)
-			output = model(data)
-			# calculate the batch loss
-			print(output.dtype, target.dtype)
-			loss = criterion(output, target.long())
-			# backward pass: compute gradient of the loss with respect to model parameters
-			loss.backward()
-			# perform a single optimization step (parameter update)
-			optimizer.step()
-			# update training loss
-			train_loss += loss.item()*data.size(0)
+			print("\r Batch: {} ".format(batch))
+			print(data.shape, target.shape)
+			if data.shape[0] == BATCH_SIZE:
+				data = data.reshape(BATCH_SIZE, 1, eeg_data.num_of_channels, eeg_data.num_of_time_frames)
+				optimizer.zero_grad()
+				# forward pass: compute predicted outputs by passing inputs to the model
+				output = model(data)
+				# calculate the batch loss
+				#print(output.dtype, target.dtype)
+				loss = criterion(output, target.long())
+				# backward pass: compute gradient of the loss with respect to model parameters
+				loss.backward()
+				# perform a single optimization step (parameter update)
+				optimizer.step()
+				# update training loss
+				train_loss += loss.item()*data.size(0)
 			
 		######################    
 		# validate the model #
 		######################
 		model.eval()
+		valid_batch = 0
 		for data, target in valid_loader:
+			valid_batch += 1
 			# move tensors to GPU if CUDA is available
 			if train_on_gpu:
 				data, target = data.cuda(), target.cuda()
-			# forward pass: compute predicted outputs by passing inputs to the model
-			output = model(data)
-			# calculate the batch loss
-			loss = criterion(output, target)
-			# update average validation loss 
-			valid_loss += loss.item()*data.size(0)
+			print('Valid batch: ', valid_batch)
+			print(data.shape, target.shape)
+			if data.shape[0] == BATCH_SIZE:
+				#Reshape data 	
+				data = data.reshape(BATCH_SIZE, 1, eeg_data.num_of_channels, eeg_data.num_of_time_frames)
+				# forward pass: compute predicted outputs by passing inputs to the model
+				output = model(data)
+				# calculate the batch loss
+				loss = criterion(output, target.long())
+				# update average validation loss 
+				valid_loss += loss.item()*data.size(0)
+				#convert output probabilities to predicted class
+				_, pred = torch.max(output, 1)
+				correct_tensor = pred.eq(target.data.view_as(pred))
+				correct = np.squeeze(correct_tensor.numpy()) if not train_on_gpu else np.squeeze(correct_tensor.cpu().numpy()) 
+				for i in range(BATCH_SIZE):
+					label = int(target.data[i])
+					class_correct[label] += correct[i].item()
+					class_total[label] += 1
+
 		
 		# calculate average losses
 		train_loss = train_loss/len(train_loader.dataset)
@@ -157,7 +186,7 @@ if __name__ == '__main__':
 		# print training/validation statistics 
 		print('Epoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f}'.format(
 			epoch, train_loss, valid_loss))
-		
+		print('Validation accuracy: ', 100.0 * np.sum(class_correct)/np.sum(class_total))	
 		# save model if validation loss has decreased
 		if valid_loss <= valid_loss_min:
 			print('Validation loss decreased ({:.6f} --> {:.6f}).  Saving model ...'.format(
